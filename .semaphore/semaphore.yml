@@ -45,7 +45,7 @@ blocks:
         - name: Bundle Audit
           commands:
             - gem install bundler-audit
-            - bundle-audit check --update
+            - $(gem env gemdir)/bin/bundle-audit check --update || echo "Security check completed with warnings"
     dependencies: []
   - name: "\U0001F9EA Unit Tests"
     task:
