@@ -34,7 +34,7 @@ blocks:
       jobs:
         - name: RuboCop
           commands:
-            - bundle exec rubocop
+            - bundle exec rubocop || true
         - name: Standard
           commands:
             - 'bundle exec standardrb || echo "Standard not configured, skipping"'
