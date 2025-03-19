@@ -6,7 +6,7 @@ agent:
     os_image: ''
   containers:
     - name: main
-      image: 'ruby:3.1'
+      image: 'ruby:3.2'
     - name: redis
       image: 'redis:7.0'
       env_vars:
@@ -38,8 +38,7 @@ blocks:
         - name: Standard
           commands:
             - 'bundle exec standardrb || echo "Standard not configured, skipping"'
-    dependencies:
-      - "\U0001F504 Integration Tests"
+    dependencies: []
   - name: "\U0001F6E1️ Security Checks"
     task:
       jobs:
@@ -59,8 +58,6 @@ blocks:
           commands:
             - bundle exec rspec spec/lib
             - bundle exec rspec spec/sidekiq
-    dependencies:
-      - "\U0001F6E1️ Security Checks"
   - name: "\U0001F504 Integration Tests"
     task:
       env_vars:
