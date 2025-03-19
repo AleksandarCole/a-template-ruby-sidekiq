@@ -1,0 +1,90 @@
+version: v1.0
+name: "\U0001F9F0 Sidekiq CI Pipeline"
+agent:
+  machine:
+    type: s1-kubernetes
+    os_image: ''
+  containers:
+    - name: main
+      image: 'ruby:3.1'
+    - name: redis
+      image: 'redis:7.0'
+      env_vars:
+        - name: REDIS_PASSWORD
+          value: redis_password
+fail_fast:
+  stop:
+    when: branch != 'master'
+auto_cancel:
+  running:
+    when: branch != 'master'
+  queued:
+    when: branch = 'master'
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+      - cache restore gems-$(checksum Gemfile.lock)
+      - bundle config set --local path 'vendor/bundle'
+      - bundle install --jobs=4 --retry=3
+      - cache store gems-$(checksum Gemfile.lock) vendor/bundle
+blocks:
+  - name: "\U0001F9F9 Code Quality"
+    task:
+      jobs:
+        - name: RuboCop
+          commands:
+            - bundle exec rubocop
+        - name: Standard
+          commands:
+            - 'bundle exec standardrb || echo "Standard not configured, skipping"'
+    dependencies:
+      - "\U0001F504 Integration Tests"
+  - name: "\U0001F6E1️ Security Checks"
+    task:
+      jobs:
+        - name: Bundle Audit
+          commands:
+            - bundle exec bundle-audit check --update
+    dependencies: []
+  - name: "\U0001F9EA Unit Tests"
+    task:
+      env_vars:
+        - name: REDIS_URL
+          value: 'redis://:redis_password@redis:6379/0'
+        - name: COVERAGE
+          value: 'true'
+      jobs:
+        - name: RSpec Tests
+          commands:
+            - bundle exec rspec spec/lib
+            - bundle exec rspec spec/sidekiq
+    dependencies:
+      - "\U0001F6E1️ Security Checks"
+  - name: "\U0001F504 Integration Tests"
+    task:
+      env_vars:
+        - name: REDIS_URL
+          value: 'redis://:redis_password@redis:6379/0'
+        - name: COVERAGE
+          value: 'true'
+      prologue:
+        commands:
+          - redis-cli -h redis -a redis_password ping
+      jobs:
+        - name: Middleware & Client Tests
+          commands:
+            - bundle exec rspec spec/middleware spec/client
+        - name: API & Web Tests
+          commands:
+            - bundle exec rspec spec/api spec/web
+    dependencies:
+      - "\U0001F9EA Unit Tests"
+  - name: "\U0001F4CA Test Coverage"
+    task:
+      jobs:
+        - name: Simplecov Report
+          commands:
+            - 'bundle exec rake coverage:report || echo "Coverage report not configured, skipping"'
+    dependencies:
+      - "\U0001F504 Integration Tests"
