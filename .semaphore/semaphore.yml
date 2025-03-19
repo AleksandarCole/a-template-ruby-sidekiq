@@ -38,8 +38,7 @@ blocks:
         - name: Standard
           commands:
             - 'bundle exec standardrb || echo "Standard not configured, skipping"'
-    dependencies:
-      - "\U0001F504 Integration Tests"
+    dependencies: []
   - name: "\U0001F6E1️ Security Checks"
     task:
       jobs:
@@ -60,6 +59,7 @@ blocks:
             - bundle exec rspec spec/lib
             - bundle exec rspec spec/sidekiq
     dependencies:
+      - "\U0001F9F9 Code Quality"
       - "\U0001F6E1️ Security Checks"
   - name: "\U0001F504 Integration Tests"
     task:
