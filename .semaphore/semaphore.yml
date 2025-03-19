@@ -44,7 +44,8 @@ blocks:
       jobs:
         - name: Bundle Audit
           commands:
-            - bundle exec bundle-audit check --update
+            - gem install bundler-audit
+            - bundle-audit check --update
     dependencies: []
   - name: "\U0001F9EA Unit Tests"
     task:
