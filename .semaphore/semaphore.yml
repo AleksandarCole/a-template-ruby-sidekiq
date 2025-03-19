@@ -1,17 +1,19 @@
 version: v1.0
-name: "\U0001F9F0 Sidekiq CI Pipeline"
+name: "\U0001F48E Ruby CI Pipeline"
 agent:
   machine:
     type: s1-kubernetes
     os_image: ''
   containers:
     - name: main
-      image: 'ruby:3.2'
-    - name: redis
-      image: 'redis:7.0'
+      image: 'ruby:3.4.2'
+    - name: postgres
+      image: 'postgres:17'
       env_vars:
-        - name: REDIS_PASSWORD
-          value: redis_password
+        - name: POSTGRES_PASSWORD
+          value: postgres
+        - name: POSTGRES_DB
+          value: myapp_test
 fail_fast:
   stop:
     when: branch != 'master'
@@ -20,76 +22,68 @@ auto_cancel:
     when: branch != 'master'
   queued:
     when: branch = 'master'
-global_job_config:
-  prologue:
-    commands:
-      - checkout
-      - cache restore gems-$(checksum Gemfile.lock)
-      - bundle config set --local path 'vendor/bundle'
-      - bundle install --jobs=4 --retry=3
-      - cache store gems-$(checksum Gemfile.lock) vendor/bundle
 blocks:
-  - name: "\U0001F9F9 Code Quality"
-    task:
-      jobs:
-        - name: RuboCop
-          commands:
-            - bundle exec rubocop
-        - name: Standard
-          commands:
-            - 'bundle exec standardrb || echo "Standard not configured, skipping"'
+  - name: ⚙️ Setup
     dependencies: []
-  - name: "\U0001F6E1️ Security Checks"
     task:
       jobs:
-        - name: Bundle Audit
+        - name: bundle
           commands:
-            - gem install bundler-audit
-            - $(gem env gemdir)/bin/bundle-audit check --update || echo "Security check completed with warnings"
-    dependencies: []
-  - name: "\U0001F9EA Unit Tests"
-    task:
-      env_vars:
-        - name: REDIS_URL
-          value: 'redis://:redis_password@redis:6379/0'
-        - name: COVERAGE
-          value: 'true'
-      jobs:
-        - name: RSpec Tests
-          commands:
-            - gem install rspec
-            - 'rspec spec/lib || echo "No lib specs found, skipping"'
-            - 'rspec spec/sidekiq || echo "No sidekiq specs found, skipping"'
+            - checkout
+            - cache restore
+            - bundle install
+            - cache store
+  - name: "\U0001F50D Code scanning"
     dependencies:
-      - "\U0001F9F9 Code Quality"
-      - "\U0001F6E1️ Security Checks"
-  - name: "\U0001F504 Integration Tests"
+      - ⚙️ Setup
     task:
-      env_vars:
-        - name: REDIS_URL
-          value: 'redis://:redis_password@redis:6379/0'
-        - name: COVERAGE
-          value: 'true'
+      jobs:
+        - name: check style + security
+          commands:
+            - checkout
+            - cache restore
+            - bundle install
+            - cache store
+            - bundle exec rubocop
+            - bundle exec brakeman
+  - name: "\U0001F9EA Unit tests"
+    dependencies:
+      - "\U0001F50D Code scanning"
+    task:
       prologue:
         commands:
-          - apt-get update && apt-get install -y redis-tools
-          - redis-cli -h redis -a redis_password ping
+          - checkout
+          - cache restore
+          - bundle install
+          - cache store
+          - 'bundle exec rake db:setup'
       jobs:
-        - name: Middleware & Client Tests
+        - name: RSpec - model tests
           commands:
-            - 'rspec spec/middleware || echo "No middleware specs found, skipping"'
-            - 'rspec spec/client || echo "No client specs found, skipping"'
-        - name: API & Web Tests
+            - bundle exec rspec spec/models
+        - name: RSpec - controller tests
           commands:
-            - 'rspec spec/api || echo "No API specs found, skipping"'
-            - 'rspec spec/web || echo "No web specs found, skipping"'
+            - bundle exec rspec spec/controllers
+      epilogue:
+        always:
+          commands:
+            - "[[ -f junit.xml ]] && test-results publish --name \"\U0001F9EA Unit tests\" junit.xml"
+  - name: "\U0001F3D7️ Integration tests"
     dependencies:
-      - "\U0001F9EA Unit Tests"
-  - name: "\U0001F4CA Test Coverage"
+      - "\U0001F9EA Unit tests"
     task:
+      prologue:
+        commands:
+          - checkout
+          - cache restore
+          - bundle install
+          - cache store
       jobs:
-        - name: Simplecov Report
+        - name: RSpec - feature specs
           commands:
-            - 'bundle exec rake coverage:report || echo "Coverage report not configured, skipping"'
-    dependencies:
-      - "\U0001F504 Integration Tests"
+            - 'bundle exec rake db:setup'
+            - bundle exec rspec spec/features
+      epilogue:
+        always:
+          commands:
+            - "[[ -f junit.xml ]] && test-results publish --name \"\U0001F9EA Unit tests\" junit.xml"
