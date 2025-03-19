@@ -34,7 +34,7 @@ blocks:
       jobs:
         - name: RuboCop
           commands:
-            - bundle exec rubocop || true
+            - bundle exec rubocop
         - name: Standard
           commands:
             - 'bundle exec standardrb || echo "Standard not configured, skipping"'
@@ -72,6 +72,7 @@ blocks:
           value: 'true'
       prologue:
         commands:
+          - apt-get update && apt-get install -y redis-tools
           - redis-cli -h redis -a redis_password ping
       jobs:
         - name: Middleware & Client Tests
